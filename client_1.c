@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define SOCKET_PATH "example.sock"
 

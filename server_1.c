@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <bits/pthreadtypes.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -8,10 +9,15 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #define SOCKET_PATH "example.sock"
 
 static int fd;
+
+typedef struct {
+    int client_fd;
+} ThreadData;
 
 /*===================================================================*/
 
@@ -43,6 +49,26 @@ void register_signal(int signum) {
     check(sigaction(signum, &new_action, NULL), "failed sigaction");
 }
 
+void* handle_client(void *arg) {
+    ThreadData* thread_data = (ThreadData*) arg;
+    int client_fd = thread_data -> client_fd;
+
+    const char *message = "Hello World";
+    ssize_t msg_len = strlen(message) + 1;
+    ssize_t bytes_written = write(client_fd, message, msg_len);
+    check(bytes_written, "Error - bytes_written");
+
+    if (bytes_written != msg_len) {
+        dprintf(2, "Error - write(): Unexpected partial result");
+        exit(1);
+    }
+
+    check(close(client_fd), "Error - close()");
+
+    free(thread_data);
+
+    return NULL;
+}
 
 int main(void) {
     register_signal(SIGINT);
@@ -65,17 +91,16 @@ int main(void) {
         int client_fd = accept(fd, NULL, NULL);
         check(client_fd, "Error - client_fd");
 
-        const char *message = "Hello World";
-        ssize_t msg_len = strlen(message) + 1;
-        ssize_t bytes_written = write(client_fd, message, msg_len);
-        check(bytes_written, "Error - bytes_written");
-
-        if (bytes_written != msg_len) {
-            dprintf(2, "Error - write(): Unexpected partial result");
-            exit(1);
+        ThreadData* thread_data = (ThreadData*)malloc(sizeof(ThreadData));
+        if (thread_data == NULL) {
+            perror("Error - malloc()");
+            exit(errno);
         }
 
-        check(close(client_fd), "Error - close()");
+        thread_data -> client_fd =  client_fd;
+
+        pthread_t client_thread;
+        check(pthread_create(&client_thread, NULL, &handle_client, (void *)thread_data), "Error - pthread_create()");
     }
 
     return 0;
