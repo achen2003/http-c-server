@@ -10,8 +10,10 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <netinet/in.h>
 
 #define SOCKET_PATH "example.sock"
+#define PORT_NUMBER 12345
 
 static int fd;
 
@@ -32,7 +34,7 @@ void check(int ret, const char* message) {
 
 void close_socket() {
     check(close(fd), "Error - close()");
-    check(unlink(SOCKET_PATH), "Error - unlink()");
+    // check(unlink(SOCKET_PATH), "Error - unlink()");
     exit(0);
 }
 
@@ -75,12 +77,14 @@ int main(void) {
     register_signal(SIGTERM);
 
     // Set up socket
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    fd = socket(AF_INET, SOCK_STREAM, 0);
     check(fd, "Error - fd");
 
-    struct sockaddr_un sockaddr = {0};
-    sockaddr.sun_family = AF_UNIX;
-    strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
+    struct sockaddr_in sockaddr = {0};
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(PORT_NUMBER);
+    sockaddr.sin_addr.s_addr = INADDR_ANY;
+    // strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
 
     // Open the server to connections
     check(bind(fd, (const struct sockaddr*) &sockaddr, sizeof(sockaddr)), "Error - bind()");

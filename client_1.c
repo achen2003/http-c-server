@@ -9,8 +9,13 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <arpa/inet.h>
 
 #define SOCKET_PATH "example.sock"
+#define PORT_NUMBER 12345
+#define SERVER_IP "127.0.0.1"
 
 /*===================================================================*/
 
@@ -25,13 +30,16 @@ void check(int ret, const char* message) {
 
 int main(void) {
     // Set up socket
-    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
     check(fd, "Error - fd");
 
-    struct sockaddr_un sockaddr = {0};
-    sockaddr.sun_family = AF_UNIX;
-    strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
+    struct sockaddr_in sockaddr = {0};
+    sockaddr.sin_family = AF_INET;
+    sockaddr.sin_port = htons(PORT_NUMBER);
+    inet_pton(AF_INET, SERVER_IP, &sockaddr.sin_addr);
+    // strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
 
+    // Connect to the server
     check(connect(fd, (const struct sockaddr*) &sockaddr, sizeof(sockaddr)), "Error - connect()");
 
     char buffer[4096];
