@@ -42,7 +42,7 @@ int main(void) {
 
     check(bytes_read, "Error - bytes_read");
     printf("Received: \"%s\"\n", buffer);
-    
+
     close(fd);
 
     return 0;
