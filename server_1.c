@@ -48,6 +48,7 @@ int main(void) {
     register_signal(SIGINT);
     register_signal(SIGTERM);
 
+    // Set up socket
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     check(fd, "Error - fd");
 
@@ -55,9 +56,11 @@ int main(void) {
     sockaddr.sun_family = AF_UNIX;
     strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
 
+    // Open the server to connections
     check(bind(fd, (const struct sockaddr*) &sockaddr, sizeof(sockaddr)), "Error - bind()");
     check(listen(fd, 0), "Error - listen()");
 
+    // Handle connections
     while (true) {
         int client_fd = accept(fd, NULL, NULL);
         check(client_fd, "Error - client_fd");
