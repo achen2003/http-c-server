@@ -16,6 +16,7 @@
 #define PORT_NUMBER 12345
 
 static int fd;
+static pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct {
     int client_fd;
@@ -58,6 +59,10 @@ void* handle_client(void *arg) {
     const char *message = "Hello World";
     ssize_t msg_len = strlen(message) + 1;
     ssize_t bytes_written = write(client_fd, message, msg_len);
+
+    // Lock client data
+    pthread_mutex_lock(&client_mutex);
+
     check(bytes_written, "Error - bytes_written");
 
     if (bytes_written != msg_len) {
@@ -66,6 +71,8 @@ void* handle_client(void *arg) {
     }
 
     check(close(client_fd), "Error - close()");
+
+    pthread_mutex_unlock(&client_mutex);
 
     free(thread_data);
 
@@ -105,6 +112,7 @@ int main(void) {
 
         pthread_t client_thread;
         check(pthread_create(&client_thread, NULL, &handle_client, (void *)thread_data), "Error - pthread_create()");
+        check(pthread_detach(client_thread), "Error - pthread_detach()");
     }
 
     return 0;
