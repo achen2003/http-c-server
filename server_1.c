@@ -27,6 +27,7 @@ static FILE *log_file = NULL;
 
 typedef struct {
     int client_fd;
+    
 } ThreadData;
 
 typedef enum {
@@ -128,6 +129,8 @@ void* handle_client(void *arg) {
     ThreadData* thread_data = (ThreadData*) arg;
     int client_fd = thread_data -> client_fd;
 
+    clock_t start_time = clock();
+
     const char *message = "Hello World";
     ssize_t msg_len = strlen(message) + 1;
     ssize_t bytes_written = write(client_fd, message, msg_len);
@@ -144,7 +147,10 @@ void* handle_client(void *arg) {
 
     check(close(client_fd), "Error - close()");
 
-    log_message(LOG_INFO, "Client request processes successfully");
+    clock_t end_time = clock();
+    double proc_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
+
+    log_message(LOG_INFO, "Client request processes successfully in %f seconds", proc_time);
 
     pthread_mutex_unlock(&client_mutex);
 
