@@ -195,24 +195,43 @@ void register_signal(int signum) {
     check(sigaction(signum, &new_action, NULL), "failed sigaction");
 }
 
+void handle_client_request(const char *request_type, const char *data, int client_fd) {
+    if (strcmp(request_type, "GET_HELLO") == 0) {
+        const char *message = "Hello client!";
+        ssize_t msg_len = strlen(message) + 1;
+        ssize_t bytes_written = write(client_fd, message, msg_len);
+
+        check(bytes_written, "Error - bytes_written");
+
+        if (bytes_written != msg_len) {
+            dprintf(2, "Error - write(): Unexpected partial result");
+            exit(1);
+        }
+    } else if (strcmp(request_type, "SEND_MESSAGE") == 0) {
+        log_message(LOG_INFO, "Received message from client: %s", data);
+    } else {
+        log_message(LOG_WARNING, "Unknown request type: %s", request_type);
+    }
+}
+
 void* handle_client(void *arg) {
     ThreadData* thread_data = (ThreadData*) arg;
     int client_fd = thread_data -> client_fd;
 
     clock_t start_time = clock();
 
-    const char *message = "Hello World";
-    ssize_t msg_len = strlen(message) + 1;
-    ssize_t bytes_written = write(client_fd, message, msg_len);
-
     // Lock client data
     pthread_mutex_lock(&client_mutex);
 
-    check(bytes_written, "Error - bytes_written");
+    // Read and process request from client
+    char buffer[4096];
+    ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer));
 
-    if (bytes_written != msg_len) {
-        dprintf(2, "Error - write(): Unexpected partial result");
-        exit(1);
+    if (bytes_read > 0) {
+        char *request_type = strtok(buffer, ":");
+        char *data = strtok(NULL, "");
+
+        handle_client_request(request_type, data, client_fd);
     }
 
     check(close(client_fd), "Error - close()");
@@ -275,5 +294,6 @@ int main(void) {
         check(pthread_detach(client_thread), "Error - pthread_detach()");
     }
 
+    // Should never reach here
     return 0;
 }
