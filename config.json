@@ -1,0 +1,4 @@
+{
+    "port": 12345,
+    "log_file_path": "/home/alex/http-c-server/logs/server_logs.txt"
+}

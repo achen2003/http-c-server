@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <stdarg.h>
 #include <time.h>
+#include <jansson.h>
 
 /*========== Global variables and data structures ==========*/
 
@@ -38,9 +39,15 @@ typedef enum {
 } LogLevel;
 
 typedef struct {
-    LogLevel log_level;
+    int port_num;
+    // LogLevel log_level;
     const char *log_file_path;
 } ServerConfig;
+
+// static ServerConfig default_config = {
+//     .port_num = 8080,
+//     .log_file_path = "server_logs.txt"
+// };
 
 /*========== Error checking functions ==========*/
 
@@ -51,6 +58,67 @@ void check(int ret, const char* message) {
     }
     perror(message);
     exit(errno);
+}
+
+void print_character_codes(const char *str) {
+    for (int i = 0; str[i] != '\0'; ++i) {
+        printf("%d ", str[i]);
+    }
+    printf("\n");
+}
+
+/*========== Configuration functions ==========*/
+
+void load_config_from_json(const char *file_path, ServerConfig *server_config) {
+    json_t *root;
+    json_error_t error;
+
+    // Load configuration data from JSON file
+    root = json_load_file(file_path, 0, &error);
+
+    if (!root) {
+        fprintf(stderr, "Error loading JSON file: %s\n", error.text);
+        exit(EXIT_FAILURE);
+    }
+
+    json_t *port_value = json_object_get(root, "port");
+
+    if (json_is_integer(port_value)) {
+        server_config -> port_num = json_integer_value(port_value);
+    } else {
+        fprintf(stderr, "Invalid 'port' value in JSON file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    json_t *log_file_path_value = json_object_get(root, "log_file_path");
+
+    if (json_is_string(log_file_path_value)) {
+        const char *log_file_path_str = json_string_value(log_file_path_value);
+
+        // Duplicate the log file path string
+        server_config -> log_file_path = strdup(log_file_path_str);
+        if (server_config -> log_file_path == NULL) {
+            fprintf(stderr, "Error duplicating log file path\n");
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        fprintf(stderr, "Invalid 'log_file_path' value in JSON file\n");
+        exit(EXIT_FAILURE);
+    }
+
+    json_decref(root);
+
+    fprintf(stdout, "Port: %d\n", server_config->port_num);
+    fprintf(stdout, "Log File Path: %s\n", server_config->log_file_path);
+    fprintf(stdout, "Loaded configuration successfully\n");
+}
+
+void init_config(ServerConfig *server_config, const char *file_path) {
+    // *server_config = default_config;
+
+    if (file_path != NULL) {
+        load_config_from_json(file_path, server_config);
+    }
 }
 
 /*========== Logging functions ==========*/
@@ -94,6 +162,8 @@ void init_log_file(const char *file_path) {
         fprintf(stderr, "Error: Could not open log file '%s'\n", file_path);
         exit(EXIT_FAILURE);
     }
+
+    fprintf(stdout, "Log file initialized successfully\n");
 }
 
 void close_log_file() {
@@ -163,7 +233,15 @@ int main(void) {
     register_signal(SIGINT);
     register_signal(SIGTERM);
 
-    init_log_file("/home/alex/http-c-server/logs/server_logs.txt");
+    const char *server_config_file_path = "/home/alex/http-c-server/config.json";
+
+    ServerConfig server_config;
+    init_config(&server_config, server_config_file_path);
+
+    // print_character_codes(server_config.log_file_path);
+
+    // This line causes issues, perhaps logging going to uninitialized destinations
+    init_log_file(server_config.log_file_path);
 
     // Set up socket
     fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -171,7 +249,7 @@ int main(void) {
 
     struct sockaddr_in sockaddr = {0};
     sockaddr.sin_family = AF_INET;
-    sockaddr.sin_port = htons(PORT_NUMBER);
+    sockaddr.sin_port = htons(server_config.port_num);
     sockaddr.sin_addr.s_addr = INADDR_ANY;
     // strncpy(sockaddr.sun_path, SOCKET_PATH, sizeof(sockaddr.sun_path) - 1);
 
