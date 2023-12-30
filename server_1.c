@@ -208,6 +208,7 @@ void handle_client_request(const char *request_type, const char *data, int clien
             exit(1);
         }
     } else if (strcmp(request_type, "SEND_MESSAGE") == 0) {
+        fprintf(stdout, "Received message from client: %s", data);
         log_message(LOG_INFO, "Received message from client: %s", data);
     } else {
         log_message(LOG_WARNING, "Unknown request type: %s", request_type);
@@ -226,15 +227,24 @@ void* handle_client(void *arg) {
     // Read and process request from client
     char buffer[4096];
     ssize_t bytes_read = read(client_fd, buffer, sizeof(buffer));
+    ssize_t total_bytes_read = 0;
 
-    if (bytes_read > 0) {
+    while (bytes_read > 0) {
+        total_bytes_read += bytes_read;
+
         char *request_type = strtok(buffer, ":");
         char *data = strtok(NULL, "");
 
         handle_client_request(request_type, data, client_fd);
+
+        // Check for request delimiter
+        if (buffer[total_bytes_read - 1] == '\n') {
+            buffer[total_bytes_read - 1] = '\0';
+            total_bytes_read = 0;
+        }
     }
 
-    check(close(client_fd), "Error - close()");
+    check(bytes_read, "Error - bytes_read");
 
     clock_t end_time = clock();
     double proc_time = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
@@ -242,6 +252,8 @@ void* handle_client(void *arg) {
     log_message(LOG_INFO, "Client request processes successfully in %f seconds", proc_time);
 
     pthread_mutex_unlock(&client_mutex);
+
+    check(close(client_fd), "Error - close()");
 
     free(thread_data);
 
@@ -259,7 +271,6 @@ int main(void) {
 
     // print_character_codes(server_config.log_file_path);
 
-    // This line causes issues, perhaps logging going to uninitialized destinations
     init_log_file(server_config.log_file_path);
 
     // Set up socket
